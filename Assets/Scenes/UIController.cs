@@ -33,7 +33,10 @@ public class UIController : MonoBehaviour
 
     [SerializeField] private GameObject box;
     [SerializeField] private GameObject spaceTxt;
+    [SerializeField]
+    InputField usernameInput;
     private bool flag = true;
+    public static string username = "";
     public void Update()
     {
         if (flag)
@@ -43,13 +46,22 @@ public class UIController : MonoBehaviour
             flag = false;
             spaceTxt.SetActive(false);
         }
-        if (Input.GetKey(KeyCode.Return))
+        if(Input.GetMouseButtonDown(0))
+        {
+            usernameInput = GameObject.Find("nameText").GetComponent<InputField>();
+            usernameInput.Select();
+            usernameInput.ActivateInputField();
+            usernameInput.text = "";
+            //Debug.Log("Mouse Clicked!");
+        }
+        /*if (Input.GetKey(KeyCode.Return))
         {
             box.SetActive(false); //hide the box
             spaceTxt.SetActive(true); //show the text
-        }
-        else if(Input.GetKey(KeyCode.Space))
+        }*/
+        if(Input.GetKey(KeyCode.Space))//start the game
         {
+            username = GameObject.Find("nameText").GetComponent<InputField>().text;
             spaceTxt.SetActive(true);
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
         }

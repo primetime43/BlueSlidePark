@@ -50,7 +50,7 @@ public class MacController : MonoBehaviour
         {
             scoreCounter++;
             updateScore();
-            Debug.Log("Ice cream hit");
+            //Debug.Log("Ice cream hit");
             isGrounded = true;
         }
     }
@@ -71,8 +71,9 @@ public class MacController : MonoBehaviour
         //scoreCounter--;
         scoreCounter = 0;
         updateScore();
-        Debug.Log("Poop hit");
-        ResetCharacter();
+        //Debug.Log("Poop hit");
+        //ResetCharacter();
+        Start();
     }
 
     // Update is called once per frame

@@ -56,8 +56,9 @@ public class WorldMover : MonoBehaviour
     {
         groundTrans.transform.position += Vector3.back * lerpSpeed * Time.deltaTime;
         pickups.transform.position += Vector3.back * lerpSpeed * Time.deltaTime;
+        //Debug.Log("Z: " + groundTrans.transform.position.z);
         if (groundTrans.transform.position.z <= -100f)
-            ResetWorld();
+            ResetWorld();//needs fixed
     }
 
     #endregion
@@ -69,7 +70,7 @@ public class WorldMover : MonoBehaviour
  * 
  */
 
-    public void ResetWorld()
+    public void ResetWorld()//needs fixed
     {
         //macGO.GetComponent<MacController>().ResetCharacter();
         //transform.position = startingPos;
@@ -82,7 +83,7 @@ public class WorldMover : MonoBehaviour
     {
         // This adds the slides gameobjects to the list, gets their size, sets them to zero, then spans them out evenly
         int count = 0;
-
+        Debug.Log("slideCount: " + slides + " slideChildGOs: " + slideChildGOs + " count: " + count);
         foreach (Transform child in groundTrans)
         {
 
@@ -112,6 +113,7 @@ public class WorldMover : MonoBehaviour
     {
         while (repeat)
         {
+            //Debug.Log("slideCount: " + slideCount + " slideChildGOs: " + slideChildGOs);
             slideCount++;
             if (slideCount > slideChildGOs - 1)
                 slideCount = 0;
