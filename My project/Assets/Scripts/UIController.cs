@@ -10,7 +10,9 @@ public class UIController : MonoBehaviour
 
     private bool initialized;
     private bool nameEntered;
+    private bool hasStartedTyping;
     private string playerName = "";
+    private string placeholderText;
     private Text nameTextComponent;
 
     private void Start()
@@ -20,15 +22,20 @@ public class UIController : MonoBehaviour
         txtBox = GameObject.Find("nameText");
         if (txtBox != null)
             nameTextComponent = txtBox.GetComponent<Text>();
+        if (nameTextComponent != null)
+            placeholderText = nameTextComponent.text;
         if (spaceTxt != null)
             spaceTxt.SetActive(false);
-        UpdateNameDisplay();
         initialized = true;
     }
 
     private void UpdateNameDisplay()
     {
-        if (nameTextComponent != null)
+        if (nameTextComponent == null) return;
+
+        if (!hasStartedTyping)
+            nameTextComponent.text = placeholderText;
+        else
             nameTextComponent.text = playerName + "_";
     }
 
@@ -68,6 +75,8 @@ public class UIController : MonoBehaviour
                 }
                 else if (playerName.Length < 20) // max name length
                 {
+                    if (!hasStartedTyping)
+                        hasStartedTyping = true;
                     playerName += c;
                 }
             }
