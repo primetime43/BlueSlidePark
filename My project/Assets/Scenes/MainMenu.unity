@@ -826,7 +826,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Type your name and press ENTER to play _
+  m_Text: YOUR NAME HERE
 --- !u!222 &710920321
 CanvasRenderer:
   m_ObjectHideFlags: 0
