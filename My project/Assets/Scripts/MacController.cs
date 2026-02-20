@@ -6,16 +6,12 @@ using UnityEngine.SceneManagement;
 /// Player controller matching original SliderMovement class from SWF.
 /// Decompiled source: SliderMovement.as (cil2as ActionScript3 from Flash SWF).
 ///
-/// Original default values from decompiled code:
-///   Speed = 3 (static), RotationOrigin = (0,0,10), RotationSpeed = 20,
-///   CutOffHeight = 4, dampLerp = 0.3, speedDampLerp = 0.3, leanLerp = 0.2,
-///   settle = 0, deathAngle = 0 (set in scene), danceAngle = 0 (set in scene).
-///
-/// Movement: Speed ramps from min(10, 6 + (time-startTime)/10).
-/// UpArrow gives 0.3s boost of +10 speed.
-/// Player rotates around pivot (RotateAround), settle factor pushes back to center.
-/// Death when euler Z exceeds deathAngle; "stupiddance" anim near danceAngle.
-/// VictoryBall pickup: bonusScore += 100.
+/// Original movement used RotateAround(Offset, forward, RotationAmount) in FixedUpdate.
+/// RotationAmount = (settle * settleFactor + input) * RotationSpeed * deltaTime.
+/// This version converts that angular rotation to linear velocity on the curved slide.
+/// The physics capsule stays upright (frozen rotation); visual lean goes on child model.
+/// The curved MeshCollider on the slide makes the player ride up the walls naturally.
+/// Death when player goes past slide edge (original: eulerAngles.z exceeds deathAngle).
 /// </summary>
 public class MacController : MonoBehaviour
 {
@@ -54,6 +50,8 @@ public class MacController : MonoBehaviour
     private float dampedRotZ;
     private float startTime;
     private float timeTilBoostEnd;
+    private Transform visualModel;
+    private bool boostRequested;
 
     private void Awake()
     {
@@ -64,12 +62,22 @@ public class MacController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         if (gameCon != null)
             gameScript = gameCon.GetComponent<WorldMover>();
+
+        // Keep physics capsule upright — visual tilt goes on child model only
+        rb.freezeRotation = true;
+        // Prevent Z drift (world scrolls past the player, player doesn't move forward)
+        rb.constraints |= RigidbodyConstraints.FreezePositionZ;
     }
 
     private void Start()
     {
         if (canvasObj != null)
             inGameUI = canvasObj.GetComponent<InGameUI>();
+
+        // Find visual model child (created by OriginalAssetLoader at runtime)
+        Transform macModel = transform.Find("MacModel");
+        if (macModel != null)
+            visualModel = macModel;
     }
 
     public void ResetCharacter()
@@ -77,25 +85,24 @@ public class MacController : MonoBehaviour
         isDead = false;
         rb.isKinematic = false;
         transform.position = startingPos;
+        transform.rotation = Quaternion.identity;
         gameScript.ResetWorld();
         rb.linearVelocity = Vector3.zero;
         isGrounded = true;
+        lean = 0f;
+        dampedRotZ = 0f;
     }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Floor"))
-        {
             isGrounded = true;
-        }
     }
 
     private void OnTriggerExit(Collider collider)
     {
         if (collider.gameObject.CompareTag("Killbox"))
-        {
             ResetCharacter();
-        }
     }
 
     private void OnTriggerEnter(Collider other)
@@ -118,26 +125,21 @@ public class MacController : MonoBehaviour
         if (isDead || immortal) return;
         isDead = true;
 
-        // Original: SlideController.Instance.running = false
         if (SlideController.Instance != null)
             SlideController.Instance.StopGame();
 
-        // Stop world movement
         if (gameScript != null)
             gameScript.enabled = false;
 
-        // Freeze player
         rb.linearVelocity = Vector3.zero;
         rb.isKinematic = true;
 
-        // Original: slideNoise.volume = 0
         if (SoundManager.Instance != null)
         {
             SoundManager.Instance.StopSlideNoise();
             SoundManager.Instance.PlayDeath();
         }
 
-        // Original: ScoreManager.instance.UploadScore() -> SubmitScore -> ExternalCall.PostScore
         int finalScore = 0;
         if (ScoreManager.Instance != null)
         {
@@ -148,44 +150,33 @@ public class MacController : MonoBehaviour
                 LeaderboardManager.Instance.SubmitScore(finalScore, SystemInfo.deviceUniqueIdentifier);
         }
 
-        // Original: Object.Instantiate(DeathScreen) - shows death panel
         if (deadMenuManager != null)
             deadMenuManager.ShowDeathScreen(finalScore);
 
-        // Original: Leaderboard.Start -> FetchLeaderboard coroutine
         if (LeaderboardManager.Instance != null)
             LeaderboardManager.Instance.FetchLeaderboard(finalScore, GetPlayerName());
     }
 
-    /// <summary>
-    /// Original SliderMovement.GetVictoryBall: bonusScore += 100, play pickupSound.
-    /// </summary>
     private void CollectPickup(GameObject pickup)
     {
-        // Original: SlideController.Instance.bonusScore += 100
         if (ScoreManager.Instance != null)
             ScoreManager.Instance.AddBonus(100);
 
-        // Original: Camera.main.audio.PlayOneShot(pickupSound, pickupVol)
         if (SoundManager.Instance != null)
             SoundManager.Instance.PlayPickup();
 
-        // Play particle effect
         var effect = pickup.GetComponent<PickupEffect>();
         if (effect != null)
             effect.PlayEffect();
 
-        // Trigger fly-up animation (original VictoryBall: flyUp = true, ShowPickup(), Invoke("Die", 5))
         var spinner = pickup.GetComponent<PickupSpinner>();
         if (spinner != null)
             spinner.ShowPickup();
 
-        // Trigger thumbs up animation for thumbs up pickups
         bool isThumbsUp = pickup.name.StartsWith("ThumbsUp");
         if (isThumbsUp && inGameUI != null)
             inGameUI.CallAnimator("ThumbUp");
 
-        // Disable collider so it can't be collected again
         var col = pickup.GetComponent<Collider>();
         if (col != null) col.enabled = false;
     }
@@ -194,7 +185,6 @@ public class MacController : MonoBehaviour
     {
         if (isDead)
         {
-            // Original: DeadMenu.OnGUI checks Jump, Space, KeypadEnter, Return, R
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return)
                 || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.R))
             {
@@ -203,62 +193,74 @@ public class MacController : MonoBehaviour
             return;
         }
 
-        if (isGrounded)
+        // Capture boost input in Update (more reliable for key presses than FixedUpdate)
+        if (Input.GetKeyDown(KeyCode.UpArrow))
+            boostRequested = true;
+
+        // Apply visual lean rotation to child model only (physics capsule stays upright)
+        if (visualModel != null)
         {
-            // Original: UpArrow boost - 0.3s of speed +10
-            if (Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                timeTilBoostEnd = Time.timeSinceLevelLoad + boostDuration;
-            }
-
-            // Original speed formula: min(10, 6 + (Time.time - startTime) / 10)
-            float targetSpeed = Mathf.Min(10f, 6f + (Time.time - startTime) / 10f);
-            if (timeTilBoostEnd > Time.timeSinceLevelLoad)
-            {
-                speed = Mathf.Lerp(speed, targetSpeed + boostAmount, speedDampLerp * Time.deltaTime);
-            }
-            else
-            {
-                speed = Mathf.Lerp(speed, targetSpeed, speedDampLerp * Time.deltaTime);
-            }
-
-            float input = Input.GetAxis("Horizontal");
-
-            rb.AddForce(Vector3.right * input * speed, ForceMode.Impulse);
-
-            // Original lean: Lerp(lean, GetAxis("Horizontal"), leanLerp * deltaTime)
-            lean = Mathf.Lerp(lean, input, leanLerp * Time.deltaTime);
+            Vector3 rot = visualModel.localEulerAngles;
+            rot.z = -dampedRotZ;
+            visualModel.localEulerAngles = rot;
         }
 
-        // Original: dampedRotZ damped rotation based on slide direction
-        dampedRotZ = Mathf.Lerp(dampedRotZ, lean * deathAngle, dampLerp * Time.deltaTime);
-        Vector3 rot = transform.eulerAngles;
-        rot.z = -dampedRotZ;
-        transform.eulerAngles = rot;
+        // Edge death: player went past slide boundary
+        if (isGrounded && !isDead && Mathf.Abs(transform.position.x) > slideHalfWidth)
+        {
+            if (!immortal)
+                Die();
+        }
+    }
 
-        // Original: settle factor pushes player back towards center
+    /// <summary>
+    /// Physics movement in FixedUpdate matching original SliderMovement.FixedUpdate.
+    /// Original used RotateAround(Offset, forward, RotationAmount).
+    /// We convert that to lateral velocity — the curved MeshCollider makes the
+    /// player naturally ride up the slide walls when pushed sideways.
+    /// </summary>
+    private void FixedUpdate()
+    {
+        if (isDead || !isGrounded) return;
+
+        // Boost (captured from Update)
+        if (boostRequested)
+        {
+            timeTilBoostEnd = Time.timeSinceLevelLoad + boostDuration;
+            boostRequested = false;
+        }
+
+        // Original speed formula: min(10, 6 + (time - startTime) / 10)
+        float targetSpeed = Mathf.Min(10f, 6f + (Time.time - startTime) / 10f);
+        if (timeTilBoostEnd > Time.timeSinceLevelLoad)
+            speed = Mathf.Lerp(speed, targetSpeed + boostAmount, speedDampLerp * Time.fixedDeltaTime);
+        else
+            speed = Mathf.Lerp(speed, targetSpeed, speedDampLerp * Time.fixedDeltaTime);
+
+        float input = Input.GetAxis("Horizontal");
+
+        // Original: lean = Lerp(lean, GetAxis("Horizontal"), leanLerp * deltaTime)
+        lean = Mathf.Lerp(lean, input, leanLerp * Time.fixedDeltaTime);
+
+        // dampedRotZ tracks visual lean angle (used for settle + visual tilt)
+        dampedRotZ = Mathf.Lerp(dampedRotZ, lean * deathAngle, dampLerp * Time.fixedDeltaTime);
+
+        // Settle calculation (original formula from SliderMovement.as lines 206-213)
+        float normZ = ((dampedRotZ % 360f) + 360f) % 360f;
         float settle = 0f;
-        float normZ = (dampedRotZ % 360f + 360f) % 360f;
         if (normZ < 180f)
             settle = -normZ / 180f;
         else
             settle = 1f - (normZ - 180f) / 180f;
 
-        Vector3 pos = transform.position;
-        if (Mathf.Abs(pos.x) > 0.1f && isGrounded)
-        {
-            pos.x = Mathf.Lerp(pos.x, 0f, Mathf.Abs(settle) * settleFactor * Time.deltaTime);
-        }
+        // Original: RotationAmount = (settle * settleFactor + input) * RotationSpeed * dt
+        // Converted to lateral velocity for our physics-based slide
+        float lateralSpeed = (settle * settleFactor + input) * rotationSpeed;
 
-        // Clamp player to slide boundaries
-        if (pos.x < -slideHalfWidth || pos.x > slideHalfWidth)
-        {
-            pos.x = Mathf.Clamp(pos.x, -slideHalfWidth, slideHalfWidth);
-            Vector3 vel = rb.linearVelocity;
-            vel.x = 0f;
-            rb.linearVelocity = vel;
-        }
-        transform.position = pos;
+        // Set X velocity directly (gravity handles Y, Z is frozen)
+        Vector3 vel = rb.linearVelocity;
+        vel.x = lateralSpeed;
+        rb.linearVelocity = vel;
     }
 
     private string GetPlayerName()
