@@ -45,7 +45,7 @@ Leaderboard Fetch (request.php)
   Likely hash formula:
   hash = SHA1(score + name + "a1e902e")
 
-  Score Submission (post_scores.php)
+Score Submission (post_scores.php)
 
   POST http://macmillerofficial.umgfacebook.com/post_scores.php
 
