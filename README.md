@@ -1,7 +1,5 @@
 # BlueSlidePark
 
-Mac Miller's Blue Slide Park game — recreated in Unity 6 from the original 2012 Flash game.
-
 ## Play the Original Game (Patched SWF)
 
 The original Flash game is playable again with a working leaderboard! Download `slide_patched.swf` from this repo and open it with [Ruffle](https://ruffle.rs/downloads) (Flash emulator).
@@ -43,7 +41,9 @@ python server/patch_swf.py localhost:3000
 
 The original Blue Slide Park game was a promotional Flash game built by PLA Studios for Universal Music Group, released alongside Mac Miller's debut album "Blue Slide Park" in 2011-2012. It was hosted at `macmillerofficial.com/BlueSlidePark-game/` and ran as a Unity 3.5 project compiled to Flash via cil2as.
 
-This project also recreates the game in Unity 6 (URP) using assets and game logic extracted from the original SWF files.
+## Unity 6 Recreation (WIP)
+
+This project is also recreating the game in Unity 6 (URP) using assets and game logic extracted from the original SWF files. This is a side project and is not yet complete.
 
 ## Original Game Videos
 
