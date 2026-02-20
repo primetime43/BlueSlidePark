@@ -302,7 +302,9 @@ app.get("/request.php", apiLimiter, async (req, res) => {
       response += `rank:${rank}\tname:${playerName}\tscore:${playerScore}\n`;
     }
 
-    res.type("text/plain").send(response);
+    // Trim trailing newline — the SWF splits by "\n" and a trailing newline
+    // creates an empty element that becomes a ghost entry (rank:0, name:null, score:0)
+    res.type("text/plain").send(response.trimEnd());
   } catch (err) {
     console.error("  Error in /request.php:", err.message);
     res.status(500).send("Server error");
