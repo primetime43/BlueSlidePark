@@ -3,16 +3,18 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
+const MAX_SCORE = 100000;
+const MAX_NAME_LENGTH = 20;
 
 // --- Database Setup ---
-// Use PostgreSQL on Heroku (DATABASE_URL set), SQLite locally
 let db;
 
 if (process.env.DATABASE_URL) {
-  // PostgreSQL (Heroku)
   const { Pool } = require("pg");
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -32,21 +34,15 @@ if (process.env.DATABASE_URL) {
           created_at TIMESTAMP DEFAULT NOW()
         )
       `);
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score DESC)
-      `);
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score DESC)");
       console.log("  Database: PostgreSQL");
     },
     async getByName(name) {
-      const res = await pool.query(
-        "SELECT id, score FROM scores WHERE name = $1 ORDER BY score DESC LIMIT 1", [name]
-      );
+      const res = await pool.query("SELECT id, score FROM scores WHERE name = $1 ORDER BY score DESC LIMIT 1", [name]);
       return res.rows[0] || null;
     },
     async getByUserId(userId) {
-      const res = await pool.query(
-        "SELECT id, score FROM scores WHERE user_id = $1 ORDER BY score DESC LIMIT 1", [userId]
-      );
+      const res = await pool.query("SELECT id, score FROM scores WHERE user_id = $1 ORDER BY score DESC LIMIT 1", [userId]);
       return res.rows[0] || null;
     },
     async updateScore(id, score) {
@@ -64,14 +60,19 @@ if (process.env.DATABASE_URL) {
       return parseInt(res.rows[0].rank, 10);
     },
     async getAllScores(limit) {
-      const res = await pool.query(
-        "SELECT name, score, created_at FROM scores ORDER BY score DESC LIMIT $1", [limit]
-      );
+      const res = await pool.query("SELECT id, user_id, name, score, created_at FROM scores ORDER BY score DESC LIMIT $1", [limit]);
       return res.rows;
+    },
+    async deleteScore(id) {
+      const res = await pool.query("DELETE FROM scores WHERE id = $1", [id]);
+      return res.rowCount > 0;
+    },
+    async updateEntry(id, name, score) {
+      const res = await pool.query("UPDATE scores SET name = $1, score = $2 WHERE id = $3", [name, score, id]);
+      return res.rowCount > 0;
     }
   };
 } else {
-  // SQLite (local development)
   const Database = require("better-sqlite3");
   const sqliteDb = new Database(path.join(__dirname, "leaderboard.db"));
   sqliteDb.pragma("journal_mode = WAL");
@@ -110,7 +111,15 @@ if (process.env.DATABASE_URL) {
       return row ? row.rank : 0;
     },
     async getAllScores(limit) {
-      return sqliteDb.prepare("SELECT name, score, created_at FROM scores ORDER BY score DESC LIMIT ?").all(limit);
+      return sqliteDb.prepare("SELECT id, user_id, name, score, created_at FROM scores ORDER BY score DESC LIMIT ?").all(limit);
+    },
+    async deleteScore(id) {
+      const res = sqliteDb.prepare("DELETE FROM scores WHERE id = ?").run(id);
+      return res.changes > 0;
+    },
+    async updateEntry(id, name, score) {
+      const res = sqliteDb.prepare("UPDATE scores SET name = ?, score = ? WHERE id = ?").run(name, score, id);
+      return res.changes > 0;
     }
   };
 }
@@ -119,12 +128,49 @@ if (process.env.DATABASE_URL) {
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.set("trust proxy", 1);
 
-// Log all incoming requests for debugging
+// Log requests
 app.use((req, res, next) => {
   console.log(`  ${req.method} ${req.url}`);
   next();
 });
+
+// --- Rate Limiting ---
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: "Too many requests, slow down",
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const submitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: "Too many score submissions",
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// --- Input Validation ---
+function validateScore(score) {
+  const n = parseInt(score, 10);
+  if (isNaN(n) || n < 0 || n > MAX_SCORE) return null;
+  return n;
+}
+
+function validateName(name) {
+  if (!name || typeof name !== "string") return null;
+  const clean = name.trim().substring(0, MAX_NAME_LENGTH);
+  if (clean.length === 0) return null;
+  // Strip anything that isn't alphanumeric, space, underscore, or dash
+  return clean.replace(/[^a-zA-Z0-9 _-]/g, "");
+}
+
+function isValidHash(hash) {
+  return typeof hash === "string" && /^[a-f0-9]{40}$/.test(hash);
+}
 
 // --- Flash Cross-Domain Policy ---
 app.get("/crossdomain.xml", (req, res) => {
@@ -136,7 +182,7 @@ app.get("/crossdomain.xml", (req, res) => {
 </cross-domain-policy>`);
 });
 
-// --- Serve game files (local only, if the game directory exists) ---
+// --- Serve game files (local only) ---
 const gamePath = path.join(
   process.env.USERPROFILE || process.env.HOME || "",
   "Downloads", "Blue Slide Park Game", "Mac Miller Blue Slide Park Game", "BlueSlidePark-game"
@@ -145,7 +191,7 @@ if (fs.existsSync(gamePath)) {
   app.use("/game", express.static(gamePath));
 }
 
-// Serve an HTML page that loads Ruffle and plays the patched SWF
+// --- Game page ---
 app.get("/", (req, res) => {
   res.type("html").send(`<!DOCTYPE html>
 <html>
@@ -184,40 +230,58 @@ app.get("/", (req, res) => {
 </html>`);
 });
 
-// --- Constants (from original SWF) ---
+// --- Constants ---
 const LEADERBOARD_SALT = "a1e902e";
 const TOP_N = 10;
 
-// --- SHA1 Hash ---
 function sha1(input) {
   return crypto.createHash("sha1").update(input, "utf8").digest("hex");
 }
 
+// --- Admin Auth Middleware ---
+function requireAdmin(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Admin"');
+    return res.status(401).send("Authentication required");
+  }
+  const decoded = Buffer.from(auth.split(" ")[1], "base64").toString();
+  const [user, pass] = decoded.split(":");
+  if (user === "admin" && pass === ADMIN_PASSWORD) {
+    return next();
+  }
+  res.set("WWW-Authenticate", 'Basic realm="Admin"');
+  return res.status(401).send("Invalid credentials");
+}
+
+// ==========================================
+// GAME API ENDPOINTS (rate-limited + validated)
+// ==========================================
+
 // --- GET /request.php ---
-app.get("/request.php", async (req, res) => {
+app.get("/request.php", apiLimiter, async (req, res) => {
   const { score, name, hash } = req.query;
 
-  if (!score || !name) {
-    return res.status(400).send("Missing parameters");
+  const playerName = validateName(name);
+  const playerScore = validateScore(score);
+
+  if (playerScore === null || !playerName) {
+    return res.status(400).send("Invalid parameters");
   }
 
-  if (hash) {
-    const expectedHash = sha1(score + name + LEADERBOARD_SALT);
-    if (hash !== expectedHash) {
-      console.log(`  Hash mismatch: got=${hash} expected=${expectedHash}`);
-    }
+  // Require a valid-format SHA1 hash (proves request came from the SWF)
+  if (!isValidHash(hash)) {
+    return res.status(403).send("Missing or invalid hash");
   }
 
   try {
-    const playerScore = parseInt(score, 10);
-
-    const existing = await db.getByName(name);
+    const existing = await db.getByName(playerName);
     if (existing) {
       if (playerScore > existing.score) {
         await db.updateScore(existing.id, playerScore);
       }
     } else {
-      await db.insertScore(name, name, playerScore);
+      await db.insertScore(playerName, playerName, playerScore);
     }
 
     const topScores = await db.getTopScores(TOP_N);
@@ -229,9 +293,9 @@ app.get("/request.php", async (req, res) => {
       response += `rank:${index + 1}\tname:${entry.name}\tscore:${entry.score}\n`;
     });
 
-    const playerInTop = topScores.some((e) => e.name === name);
+    const playerInTop = topScores.some((e) => e.name === playerName);
     if (!playerInTop) {
-      response += `rank:${rank}\tname:${name}\tscore:${playerScore}\n`;
+      response += `rank:${rank}\tname:${playerName}\tscore:${playerScore}\n`;
     }
 
     res.type("text/plain").send(response);
@@ -242,19 +306,19 @@ app.get("/request.php", async (req, res) => {
 });
 
 // --- POST /post_scores.php ---
-app.post("/post_scores.php", async (req, res) => {
+app.post("/post_scores.php", submitLimiter, async (req, res) => {
   const { user_id, score, name } = req.body;
 
-  if (!user_id || score === undefined) {
-    return res.status(400).send("Missing parameters");
+  if (!user_id) {
+    return res.status(400).send("Missing user_id");
   }
 
-  const playerScore = parseInt(score, 10);
-  if (isNaN(playerScore)) {
+  const playerScore = validateScore(score);
+  if (playerScore === null) {
     return res.status(400).send("Invalid score");
   }
 
-  const playerName = name || user_id || "Player";
+  const playerName = validateName(name || user_id) || "Player";
 
   try {
     const existing = await db.getByUserId(user_id);
@@ -272,10 +336,174 @@ app.post("/post_scores.php", async (req, res) => {
   }
 });
 
-// --- Admin: View leaderboard ---
+// ==========================================
+// ADMIN PANEL (password-protected)
+// ==========================================
+
+// --- Admin API ---
+app.get("/admin/api/scores", requireAdmin, async (req, res) => {
+  try {
+    const scores = await db.getAllScores(200);
+    res.json(scores);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/admin/api/scores/:id", requireAdmin, async (req, res) => {
+  try {
+    const ok = await db.deleteScore(parseInt(req.params.id, 10));
+    res.json({ success: ok });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/admin/api/scores/:id", requireAdmin, async (req, res) => {
+  const { name, score } = req.body;
+  const cleanName = validateName(name);
+  const cleanScore = validateScore(score);
+  if (!cleanName || cleanScore === null) {
+    return res.status(400).json({ error: "Invalid name or score" });
+  }
+  try {
+    const ok = await db.updateEntry(parseInt(req.params.id, 10), cleanName, cleanScore);
+    res.json({ success: ok });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Admin Panel HTML ---
+app.get("/admin", requireAdmin, (req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>BSP Leaderboard Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+    h1 { margin-bottom: 20px; color: #4fc3f7; }
+    .stats { margin-bottom: 20px; color: #aaa; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #16213e; padding: 10px; text-align: left; border-bottom: 2px solid #4fc3f7; }
+    td { padding: 8px 10px; border-bottom: 1px solid #333; }
+    tr:hover { background: #16213e; }
+    input { background: #222; color: #eee; border: 1px solid #555; padding: 4px 8px; border-radius: 3px; }
+    input:focus { border-color: #4fc3f7; outline: none; }
+    button { padding: 4px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+    .btn-save { background: #4fc3f7; color: #000; }
+    .btn-save:hover { background: #39a7db; }
+    .btn-delete { background: #e74c3c; color: #fff; }
+    .btn-delete:hover { background: #c0392b; }
+    .btn-cancel { background: #555; color: #fff; }
+    .btn-cancel:hover { background: #777; }
+    .btn-refresh { background: #4fc3f7; color: #000; padding: 8px 16px; font-size: 14px; margin-bottom: 10px; }
+    .msg { padding: 8px; margin: 10px 0; border-radius: 3px; display: none; }
+    .msg.ok { display: block; background: #1b5e20; }
+    .msg.err { display: block; background: #b71c1c; }
+  </style>
+</head>
+<body>
+  <h1>Blue Slide Park - Leaderboard Admin</h1>
+  <button class="btn-refresh" onclick="load()">Refresh</button>
+  <div class="stats" id="stats"></div>
+  <div class="msg" id="msg"></div>
+  <table>
+    <thead><tr><th>Rank</th><th>ID</th><th>User ID</th><th>Name</th><th>Score</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script>
+    let scores = [];
+
+    async function api(method, url, body) {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(url, opts);
+      return res.json();
+    }
+
+    function showMsg(text, ok) {
+      const el = document.getElementById("msg");
+      el.textContent = text;
+      el.className = "msg " + (ok ? "ok" : "err");
+      setTimeout(() => el.className = "msg", 3000);
+    }
+
+    async function load() {
+      try {
+        scores = await api("GET", "/admin/api/scores");
+        document.getElementById("stats").textContent = scores.length + " entries";
+        render();
+      } catch (e) { showMsg("Failed to load: " + e.message, false); }
+    }
+
+    function render() {
+      const tbody = document.getElementById("tbody");
+      tbody.innerHTML = scores.map((s, i) => \`
+        <tr id="row-\${s.id}">
+          <td>\${i + 1}</td>
+          <td>\${s.id}</td>
+          <td>\${esc(s.user_id)}</td>
+          <td id="name-\${s.id}">\${esc(s.name)}</td>
+          <td id="score-\${s.id}">\${s.score}</td>
+          <td>\${new Date(s.created_at).toLocaleString()}</td>
+          <td>
+            <button class="btn-save" onclick="startEdit(\${s.id})">Edit</button>
+            <button class="btn-delete" onclick="del(\${s.id})">Delete</button>
+          </td>
+        </tr>
+      \`).join("");
+    }
+
+    function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+    function startEdit(id) {
+      const s = scores.find(x => x.id === id);
+      if (!s) return;
+      const nameCell = document.getElementById("name-" + id);
+      const scoreCell = document.getElementById("score-" + id);
+      nameCell.innerHTML = \`<input id="edit-name-\${id}" value="\${esc(s.name)}" style="width:120px">\`;
+      scoreCell.innerHTML = \`<input id="edit-score-\${id}" type="number" value="\${s.score}" style="width:80px">\`;
+      const row = document.getElementById("row-" + id);
+      const actions = row.querySelector("td:last-child");
+      actions.innerHTML = \`
+        <button class="btn-save" onclick="saveEdit(\${id})">Save</button>
+        <button class="btn-cancel" onclick="render()">Cancel</button>
+      \`;
+    }
+
+    async function saveEdit(id) {
+      const name = document.getElementById("edit-name-" + id).value;
+      const score = parseInt(document.getElementById("edit-score-" + id).value, 10);
+      try {
+        const res = await api("PUT", "/admin/api/scores/" + id, { name, score });
+        if (res.success) { showMsg("Updated", true); load(); }
+        else showMsg("Update failed", false);
+      } catch (e) { showMsg("Error: " + e.message, false); }
+    }
+
+    async function del(id) {
+      if (!confirm("Delete this entry?")) return;
+      try {
+        const res = await api("DELETE", "/admin/api/scores/" + id);
+        if (res.success) { showMsg("Deleted", true); load(); }
+        else showMsg("Delete failed", false);
+      } catch (e) { showMsg("Error: " + e.message, false); }
+    }
+
+    load();
+  </script>
+</body>
+</html>`);
+});
+
+// --- Public leaderboard JSON (read-only, no auth) ---
 app.get("/leaderboard", async (req, res) => {
   try {
-    const scores = await db.getAllScores(50);
+    const scores = await db.getTopScores(50);
     res.json(scores);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -287,9 +515,7 @@ async function start() {
   await db.init();
   app.listen(PORT, () => {
     console.log(`Blue Slide Park Leaderboard Server running on port ${PORT}`);
-    console.log(`  GET  /request.php?score=100&name=Test&hash=<sha1>`);
-    console.log(`  POST /post_scores.php  (user_id, score)`);
-    console.log(`  GET  /leaderboard  (admin view)`);
+    console.log(`  Admin panel: /admin (user: admin, pass: ${ADMIN_PASSWORD === "admin" ? "admin [SET ADMIN_PASSWORD env var!]" : "***"})`);
   });
 }
 
