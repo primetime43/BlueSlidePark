@@ -182,6 +182,12 @@ app.get("/crossdomain.xml", (req, res) => {
 </cross-domain-policy>`);
 });
 
+// --- Serve static assets ---
+app.use("/assets", express.static(path.join(__dirname, "assets")));
+app.get("/titlescreen.png", (req, res) => {
+  res.sendFile(path.join(__dirname, "titlescreen.png"));
+});
+
 // --- Serve game files (local only) ---
 const gamePath = path.join(
   process.env.USERPROFILE || process.env.HOME || "",
@@ -541,7 +547,8 @@ app.get("/leaderboards", async (req, res) => {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(135deg, #1a6b1a 0%, #2d8f2d 30%, #4fc3f7 70%, #0288d1 100%);
+      background: url("/titlescreen.png") no-repeat center center fixed;
+      background-size: cover;
       min-height: 100vh;
       padding: 30px 20px;
       color: #fff;
