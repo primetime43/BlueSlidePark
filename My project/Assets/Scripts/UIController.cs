@@ -2,11 +2,28 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
+/// <summary>
+/// Main menu controller matching original StartMenu + TextEntry classes from SWF.
+///
+/// Original StartMenu fields: restarted, startButton, startButtonHover, style,
+/// buttonRect, haveName, nameentryUI, wasHovering, sendName, playerName,
+/// startSound, buttonHoverSound.
+///
+/// Original TextEntry fields: text, enterText, textMaxLength (20), message,
+/// startScreen, cursorOn, blinkRate.
+///
+/// Original flow: TextEntry for name input -> StartMenu_NameEntered ->
+/// StartMenu_DelayedHaveName -> load level.
+/// </summary>
 public class UIController : MonoBehaviour
 {
     [SerializeField] private GameObject txtBox;
     [SerializeField] private GameObject box;
     [SerializeField] private GameObject spaceTxt;
+
+    [Header("Text Entry (original TextEntry class)")]
+    [SerializeField] private int textMaxLength = 20;
+    [SerializeField] private float cursorBlinkRate = 0.5f;
 
     private bool initialized;
     private bool nameEntered;
@@ -14,6 +31,10 @@ public class UIController : MonoBehaviour
     private string playerName = "";
     private string placeholderText;
     private Text nameTextComponent;
+
+    // Cursor blinking (original TextEntry had cursorOn + blinkRate)
+    private float cursorBlinkTimer;
+    private bool cursorVisible = true;
 
     private void Start()
     {
@@ -34,19 +55,42 @@ public class UIController : MonoBehaviour
         if (nameTextComponent == null) return;
 
         if (!hasStartedTyping)
+        {
             nameTextComponent.text = placeholderText;
+        }
         else
-            nameTextComponent.text = playerName + "_";
+        {
+            // Blinking cursor like original TextEntry
+            string cursor = cursorVisible ? "_" : " ";
+            nameTextComponent.text = playerName + cursor;
+        }
     }
 
     public void LoadSceneButton()
     {
         if (!nameEntered && playerName.Length > 0)
         {
-            nameEntered = true;
-            if (box != null) box.SetActive(false);
-            if (spaceTxt != null) spaceTxt.SetActive(true);
+            NameEntered();
         }
+    }
+
+    /// <summary>
+    /// Matches original StartMenu_NameEntered -> DelayedHaveName flow.
+    /// </summary>
+    private void NameEntered()
+    {
+        nameEntered = true;
+
+        // Save player name (original used playerName field passed to leaderboard)
+        PlayerPrefs.SetString("PlayerName", playerName);
+        PlayerPrefs.Save();
+
+        if (box != null) box.SetActive(false);
+        if (spaceTxt != null) spaceTxt.SetActive(true);
+
+        // Play start sound
+        if (SoundManager.Instance != null)
+            SoundManager.Instance.PlayStart();
     }
 
     private void Update()
@@ -54,26 +98,32 @@ public class UIController : MonoBehaviour
         if (!initialized)
             return;
 
+        // Blink cursor
+        cursorBlinkTimer += Time.deltaTime;
+        if (cursorBlinkTimer >= cursorBlinkRate)
+        {
+            cursorBlinkTimer = 0f;
+            cursorVisible = !cursorVisible;
+        }
+
         if (!nameEntered)
         {
-            // Handle typing
+            // Handle typing (original TextEntry_Update)
             foreach (char c in Input.inputString)
             {
                 if (c == '\b') // backspace
                 {
                     if (playerName.Length > 0)
                         playerName = playerName.Substring(0, playerName.Length - 1);
+                    if (playerName.Length == 0)
+                        hasStartedTyping = false;
                 }
                 else if (c == '\n' || c == '\r') // enter
                 {
                     if (playerName.Length > 0)
-                    {
-                        nameEntered = true;
-                        if (box != null) box.SetActive(false);
-                        if (spaceTxt != null) spaceTxt.SetActive(true);
-                    }
+                        NameEntered();
                 }
-                else if (playerName.Length < 20) // max name length
+                else if (playerName.Length < textMaxLength)
                 {
                     if (!hasStartedTyping)
                         hasStartedTyping = true;

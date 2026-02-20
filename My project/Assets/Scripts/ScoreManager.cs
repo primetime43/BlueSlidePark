@@ -1,6 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Score tracking matching original ScoreManager from SWF.
+/// Original fields: score, bestScore, userID.
+/// Original methods: OnEnable, SubmitScore, GameOver, Update, SetScore, UploadScore.
+/// Best score persisted in PlayerPrefs (original used PlayerPrefs too).
+/// </summary>
 public class ScoreManager : MonoBehaviour
 {
     public static ScoreManager Instance { get; private set; }
@@ -11,6 +17,18 @@ public class ScoreManager : MonoBehaviour
     private float distanceScore;
     private int bonusScore;
     private bool scoring = true;
+
+    private const string BestScoreKey = "BestScore";
+
+    public int BestScore
+    {
+        get { return PlayerPrefs.GetInt(BestScoreKey, 0); }
+        private set
+        {
+            PlayerPrefs.SetInt(BestScoreKey, value);
+            PlayerPrefs.Save();
+        }
+    }
 
     private void Awake()
     {
@@ -44,9 +62,16 @@ public class ScoreManager : MonoBehaviour
         UpdateDisplay();
     }
 
+    /// <summary>
+    /// Matches original ScoreManager.GameOver() - stops scoring and updates best.
+    /// </summary>
     public void StopScoring()
     {
         scoring = false;
+
+        int current = GetScore();
+        if (current > BestScore)
+            BestScore = current;
     }
 
     public int GetScore()
