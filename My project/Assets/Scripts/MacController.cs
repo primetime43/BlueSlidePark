@@ -84,16 +84,32 @@ public class MacController : MonoBehaviour
     {
         isDead = false;
         rb.isKinematic = false;
+        rb.freezeRotation = true;
         transform.position = startingPos;
         transform.rotation = Quaternion.identity;
-        gameScript.ResetWorld();
         rb.linearVelocity = Vector3.zero;
+
+        if (gameScript != null)
+        {
+            gameScript.enabled = true;
+            gameScript.ResetWorld();
+        }
+
+        if (SlideController.Instance != null)
+            SlideController.Instance.StartGame();
+
         isGrounded = true;
         lean = 0f;
         dampedRotZ = 0f;
     }
 
     private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Floor"))
+            isGrounded = true;
+    }
+
+    private void OnCollisionStay(Collision collision)
     {
         if (collision.gameObject.CompareTag("Floor"))
             isGrounded = true;

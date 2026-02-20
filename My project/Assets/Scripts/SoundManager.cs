@@ -42,14 +42,12 @@ public class SoundManager : MonoBehaviour
 
     private void Awake()
     {
-        // Original: singleton with DontDestroyOnLoad
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Destroy(this);
             return;
         }
         Instance = this;
-        DontDestroyOnLoad(gameObject);
 
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
