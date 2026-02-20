@@ -516,6 +516,100 @@ app.get("/leaderboard", async (req, res) => {
   }
 });
 
+// --- Public leaderboard page ---
+app.get("/leaderboards", async (req, res) => {
+  try {
+    const rawScores = await db.getTopScores(55);
+    const scores = rawScores
+      .filter((e) => e.name && e.name !== "null" && e.score > 0)
+      .slice(0, 50);
+    const rows = scores.map((s, i) => {
+      const rank = i + 1;
+      const medal = rank === 1 ? "&#x1F947;" : rank === 2 ? "&#x1F948;" : rank === 3 ? "&#x1F949;" : rank;
+      return `<tr${rank <= 3 ? ' class="top3"' : ""}><td>${medal}</td><td>${esc(s.name)}</td><td>${s.score.toLocaleString()}</td></tr>`;
+    }).join("");
+
+    res.type("html").send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blue Slide Park - Leaderboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Knewave&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #1a6b1a 0%, #2d8f2d 30%, #4fc3f7 70%, #0288d1 100%);
+      min-height: 100vh;
+      padding: 30px 20px;
+      color: #fff;
+    }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 {
+      font-family: "Knewave", cursive;
+      font-size: 2.5em;
+      text-align: center;
+      color: #fff;
+      text-shadow: 3px 3px 0 #000, -1px -1px 0 #000;
+      margin-bottom: 5px;
+    }
+    .subtitle {
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      margin-bottom: 25px;
+      font-size: 0.9em;
+    }
+    .card {
+      background: rgba(0,0,0,0.6);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      font-family: "Knewave", cursive;
+      font-size: 1.1em;
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+      color: #4fc3f7;
+    }
+    th:last-child, td:last-child { text-align: right; }
+    td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 1em; }
+    tr:hover { background: rgba(255,255,255,0.05); }
+    tr.top3 td { font-weight: bold; font-size: 1.05em; }
+    .empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.5); }
+    .footer { text-align: center; margin-top: 20px; color: rgba(255,255,255,0.5); font-size: 0.8em; }
+    .footer a { color: rgba(255,255,255,0.7); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>BLUE SLIDE PARK</h1>
+    <p class="subtitle">Leaderboard</p>
+    <div class="card">
+      ${scores.length > 0
+        ? `<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table>`
+        : '<p class="empty">No scores yet. Be the first!</p>'
+      }
+    </div>
+    <p class="footer">Mac Miller's Blue Slide Park Game &mdash; <a href="https://github.com/primetime43/BlueSlidePark">GitHub</a></p>
+  </div>
+</body>
+</html>`);
+  } catch (err) {
+    console.error("  Error in /leaderboards:", err.message);
+    res.status(500).send("Server error");
+  }
+});
+
+function esc(s) {
+  if (!s) return "";
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 // --- Start Server ---
 async function start() {
   await db.init();
