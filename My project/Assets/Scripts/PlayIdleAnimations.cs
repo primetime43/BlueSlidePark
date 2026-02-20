@@ -2,17 +2,27 @@ using UnityEngine;
 
 /// <summary>
 /// Idle animation controller matching original PlayIdleAnimations class from SWF.
-/// Original fields: mAnim, mIdle, mBreaks (array of break animations),
-/// mNextBreak (time of next break), mLastIndex (last break animation played).
-/// Plays idle animation with occasional break animations for variety.
+/// Decompiled source: PlayIdleAnimations.as
+///
+/// Original behavior:
+///   Start: finds Animation component in children
+///     - "idle" clip → layer 0 (base idle)
+///     - clips starting with "idle" → layer 1 (break animations)
+///   Update: if mNextBreak < Time.time → play random break
+///     - Single break: interval = clip.length + Random(5, 15)
+///     - Multiple breaks: interval = clip.length + Random(2, 8)
+///     - Avoids same break twice in a row (index + 1 wrapping)
+///
+/// Original fields: mAnim, mIdle, mBreaks, mNextBreak, mLastIndex.
 /// </summary>
 public class PlayIdleAnimations : MonoBehaviour
 {
     [SerializeField] private Animator animator;
     [SerializeField] private string idleStateName = "Idle";
     [SerializeField] private string[] breakTriggers;
-    [SerializeField] private float minBreakInterval = 5f;
-    [SerializeField] private float maxBreakInterval = 15f;
+    // Original intervals: single break = 5-15s, multiple breaks = 2-8s
+    [SerializeField] private float minBreakInterval = 2f;
+    [SerializeField] private float maxBreakInterval = 8f;
 
     private float nextBreakTime;
     private int lastBreakIndex = -1;

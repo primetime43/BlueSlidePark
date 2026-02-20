@@ -4,16 +4,22 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Main menu controller matching original StartMenu + TextEntry classes from SWF.
+/// Decompiled source: StartMenu.as, TextEntry.as
 ///
-/// Original StartMenu fields: restarted, startButton, startButtonHover, style,
-/// buttonRect, haveName, nameentryUI, wasHovering, sendName, playerName,
-/// startSound, buttonHoverSound.
+/// Original TextEntry behavior:
+///   - Manual key-by-key input: A-Z keys + Space only (all uppercase)
+///   - Backspace deletes last character
+///   - Enter/Return submits name → sends "NameEntered" message to startScreen
+///   - Saves name to PlayerPrefs "playerName"
+///   - Cursor blink via InvokeRepeating("CursorOn", 0, blinkRate) and
+///     InvokeRepeating("CursorOff", blinkRate*0.5, blinkRate)
+///   - Display: text + (cursorOn ? "_" : "") on UILabel
 ///
-/// Original TextEntry fields: text, enterText, textMaxLength (20), message,
-/// startScreen, cursorOn, blinkRate.
-///
-/// Original flow: TextEntry for name input -> StartMenu_NameEntered ->
-/// StartMenu_DelayedHaveName -> load level.
+/// Original StartMenu behavior:
+///   - Fetches Facebook name via ExternalCall.FetchName()
+///   - After name entry: hides nameentryUI, Invoke("DelayedHaveName", 0.3)
+///   - Start game: Destroy(self), Play startSound, Instantiate Resources.Load("SlideController")
+///   - Button hover: play buttonHoverSound
 /// </summary>
 public class UIController : MonoBehaviour
 {
@@ -108,27 +114,35 @@ public class UIController : MonoBehaviour
 
         if (!nameEntered)
         {
-            // Handle typing (original TextEntry_Update)
-            foreach (char c in Input.inputString)
+            // Original TextEntry_Update: manual key-by-key A-Z + Space only (uppercase)
+            for (KeyCode k = KeyCode.A; k <= KeyCode.Z; k++)
             {
-                if (c == '\b') // backspace
+                if (Input.GetKeyDown(k))
                 {
-                    if (playerName.Length > 0)
-                        playerName = playerName.Substring(0, playerName.Length - 1);
-                    if (playerName.Length == 0)
-                        hasStartedTyping = false;
+                    if (playerName.Length < textMaxLength)
+                    {
+                        if (!hasStartedTyping) hasStartedTyping = true;
+                        playerName += (char)('A' + (k - KeyCode.A));
+                    }
                 }
-                else if (c == '\n' || c == '\r') // enter
-                {
-                    if (playerName.Length > 0)
-                        NameEntered();
-                }
-                else if (playerName.Length < textMaxLength)
-                {
-                    if (!hasStartedTyping)
-                        hasStartedTyping = true;
-                    playerName += c;
-                }
+            }
+            if (Input.GetKeyDown(KeyCode.Space) && playerName.Length < textMaxLength)
+            {
+                if (!hasStartedTyping) hasStartedTyping = true;
+                playerName += " ";
+            }
+            if (playerName.Length > textMaxLength)
+                playerName = playerName.Substring(0, textMaxLength);
+            if (Input.GetKeyDown(KeyCode.Backspace) && playerName.Length > 0)
+            {
+                playerName = playerName.Substring(0, playerName.Length - 1);
+                if (playerName.Length == 0)
+                    hasStartedTyping = false;
+            }
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                if (playerName.Length > 0)
+                    NameEntered();
             }
             UpdateNameDisplay();
         }

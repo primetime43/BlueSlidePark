@@ -2,8 +2,15 @@ using UnityEngine;
 
 /// <summary>
 /// Replaces the simple spinner with the original VictoryBall behavior from the SWF.
-/// Original fields: rotSpeed, flyUpSpeed, pickupPos, flyUp, model.
-/// Spins and bobs while idle, flies upward when collected (ShowPickup/Die).
+/// Decompiled source: VictoryBall.as
+///
+/// Original behavior:
+///   Start: model = transform.Find("ICE_CREAM")
+///   Update: model.Rotate(0, rotSpeed, 0); if flyUp: Translate(0, flyUpSpeed, 0, Self)
+///   OnTriggerEnter: if other.name == "PlayerObj" → GetVictoryBall, flyUp=true,
+///                   ShowPickup(), Invoke("Die", 5)
+///   ShowPickup: instantiate pickupParticle at pickupPos, parent to UICamera
+///   Die: Destroy(gameObject)
 /// </summary>
 public class PickupSpinner : MonoBehaviour
 {
@@ -27,17 +34,13 @@ public class PickupSpinner : MonoBehaviour
     {
         if (flyUp)
         {
-            // Original VictoryBall fly-up behavior
-            transform.Translate(Vector3.up * flyUpSpeed * Time.deltaTime, Space.World);
+            // Original: transform.Translate(0, flyUpSpeed, 0, Space.Self)
+            transform.Translate(Vector3.up * flyUpSpeed * Time.deltaTime, Space.Self);
             transform.Rotate(Vector3.up, rotSpeed * 3f * Time.deltaTime, Space.World);
-
-            // Self-destruct after flying high enough
-            if (transform.position.y > 20f)
-                Destroy(gameObject);
         }
         else
         {
-            // Idle spin and bob
+            // Original: model.Rotate(0, rotSpeed, 0)
             transform.Rotate(Vector3.up, rotSpeed * Time.deltaTime, Space.World);
             Vector3 pos = startPos;
             pos.y += Mathf.Sin(Time.time * bobSpeed) * bobHeight;
@@ -46,13 +49,23 @@ public class PickupSpinner : MonoBehaviour
     }
 
     /// <summary>
-    /// Called on pickup collection. Matches original VictoryBall.ShowPickup().
-    /// Detaches from parent and flies upward.
+    /// Called on pickup collection. Matches original VictoryBall.ShowPickup + OnTriggerEnter.
+    /// Original: flyUp = true, ShowPickup(), Invoke("Die", 5)
     /// </summary>
     public void ShowPickup()
     {
         flyUp = true;
         // Detach so it doesn't scroll with the world
         transform.SetParent(null);
+        // Original: Invoke("Die", 5) — self-destructs after 5 seconds
+        Invoke(nameof(Die), 5f);
+    }
+
+    /// <summary>
+    /// Original: VictoryBall.Die → Object.Destroy(gameObject)
+    /// </summary>
+    private void Die()
+    {
+        Destroy(gameObject);
     }
 }

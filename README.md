@@ -140,6 +140,96 @@ Each tier had a corresponding texture and threshold value. Prize claiming was av
 
 ---
 
+## Decompiled Source Code (AS3 from JPEXS)
+
+The original game scripts were decompiled from the SWF using JPEXS Free Flash Decompiler. The SWF contained Unity 3.5.2f2 assets compiled to Flash via cil2as. All scripts are in ActionScript3 format (`scripts/global/*.as`).
+
+### Key Discoveries from Decompiled Code
+
+**Movement System (SliderMovement.as):**
+- Speed starts at 3, dynamically calculated: `min(10, 6 + (Time.time - startTime) / 10)` — ramps from 6 to 10 over 40 seconds
+- UpArrow gives 0.3-second speed boost of +10
+- `dampLerp = 0.3`, `speedDampLerp = 0.3`, `leanLerp = 0.2` (originally guessed higher)
+- Player uses `RotateAround` with rotation origin `(0, 0, 10)` and `RotationSpeed = 20`
+- Settle formula: `RotationAmount = (settle * settleFactor + Input.Horizontal) * RotationSpeed * deltaTime`
+- Animations: `idle`, `stupiddance` (layer 1), `leftlean`/`rightlean`/`leftloop`/`rightloop` (layer 2, Additive blend, ClampForever)
+- Death when euler Z exceeds `deathAngle`; `danceAngle` triggers "stupiddance" animation weight
+
+**Slide Generation (SlideController.as):**
+- `StartingPieces = 14`, `PiecesAtOnce = 30`, `Offset = 30`
+- `TurnCooldown = 10`, `TurnDirectionCount = 10`
+- Trees: 1/6 chance per piece, placed 30-100 units left or right, +10 units up
+- Obstacles: 1/10 chance, child rotated -60 to 60 degrees around forward
+- VictoryBalls: 1/6 chance (mutually exclusive with obstacles)
+- Score formula: `PieceNumber - StartingPieces + bonusScore`
+- Turn direction: count resets to Random(20,30), isLeft = Random(1,3)==1 (1/3 left)
+
+**Scoring (ScoreManager.as):**
+- Score set by SlideController: `PieceNumber - StartingPieces + bonusScore`
+- VictoryBall collection: `bonusScore += 100` (not 25/50)
+- Best score via PlayerPrefs "BestScore"
+- playerName and userID fields for Facebook integration
+
+**Death Screen (DeadMenu.as):**
+- Uses **strictly greater-than** (`>`) for tier comparisons, not `>=`
+- Prize claiming at score `>= 1500` (separate condition from tiers)
+- Restart via: Space, Enter, KeypadEnter, R key, or button click
+- Calls `ExternalCall.Eval("setTweetLinks(" + score + ");")` on death
+
+**SoundManager.as:**
+- Surprisingly simple: singleton with `DontDestroyOnLoad`
+- `Update()`: positions itself at `Camera.main.transform.position` each frame
+- No audio clip fields — sounds were stored on individual classes (SliderMovement, StartMenu, DeadMenu)
+
+**VictoryBall.as:**
+- Model child found by name: `transform.Find("ICE_CREAM")`
+- On trigger with "PlayerObj": `bonusScore += 100`, play pickupSound, `flyUp = true`, `Invoke("Die", 5)`
+- ShowPickup: instantiates `pickupParticle` at `pickupPos`, parents to UICamera
+
+**TextEntry.as:**
+- Manual key-by-key input: only A-Z keys + Space (all uppercase)
+- Cursor blink via `InvokeRepeating("CursorOn", 0, blinkRate)` and `InvokeRepeating("CursorOff", blinkRate*0.5, blinkRate)`
+- Saves to PlayerPrefs "playerName"
+
+**ObsticleCollider.as (important!):**
+- Uses **layer-based** collision detection, not tags!
+- `if (other.gameObject.layer == LayerMask.NameToLayer("PlayerDeathCollider"))` → `SendMessageUpwards("Die")`
+
+**MuteQuality.as (previously unknown):**
+- Mute toggle: `AudioListener.pause`, `AudioListener.volume = 0`, mutes all AudioSources
+- Quality toggle: directional light `shadows = None` (low) vs `Hard` (high)
+- Persisted via PlayerPrefs "Muted" and "Low Quality"
+- On/Off/Rollover textures for both buttons
+
+**Music.as:**
+- Sets `source.loop = true` on each song AND advances index
+- Songs playlist with sequential looping
+
+**ObsticlePosition.as:**
+- Default Offset: `(0, 12, 0)` — obstacles positioned 12 units above slide
+
+**PlayIdleAnimations.as:**
+- Base idle clip (layer 0), break clips starting with "idle" (layer 1)
+- Break intervals: single break = 5-15s, multiple breaks = 2-8s
+
+### UI Framework
+- **NGUI** (Next-Gen UI) was the original UI framework
+- Knewave Google Font for all game text
+- `nameentry` UILabel reference
+
+### Embedded Binary Assets (in SWF DefineBinaryData)
+| chId | Container Name | Content |
+|------|---------------|---------|
+| 3 | `com.unity.UnityNative_dataSegmentBytes` | Native code |
+| 4 | `ProjectSerializedFileContainer_Resources_unity_default_resources` | Default resources |
+| 5 | `ProjectSerializedFileContainer_sharedassets0_assets` | Scripts, audio (MP3/LAME), fonts (Knewave), UI |
+| 6 | `ProjectSerializedFileContainer_mainData` | Scene data, meshes, character model |
+| 7 | `ProjectSerializedFileContainer_resources_assets` | Additional resources |
+
+The sharedassets0 file (15.9 MB) has a valid Unity 3.5.2f2 header. Character model (`MAC_MILLER_BOY`) is likely in mainData (chId 6).
+
+---
+
 ## Unity 6 Recreation — Implemented Features
 
 ### Scripts
@@ -164,6 +254,7 @@ Each tier had a corresponding texture and threshold value. Prize claiming was av
 | `NumbersDisplay.cs` | Numbers | Animated number counting display |
 | `UIController.cs` | StartMenu + TextEntry | Name entry with blinking cursor, "YOUR NAME HERE" placeholder |
 | `InGameUI.cs` | — | Animation trigger bridge (ThumbUp flash) |
+| `MuteQuality.cs` | MuteQuality | Mute toggle + quality/shadows toggle with PlayerPrefs |
 | `BillboardSprite.cs` | — | Camera-facing sprite utility |
 
 ### Scene Setup

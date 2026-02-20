@@ -1,9 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Manages background music playback. Original game had a Music class with
-/// a songs array and sequential playback (Music_PlaySong, Music_Update).
-/// Singleton pattern matching original Music$instance$.
+/// Manages background music playback matching original Music class from SWF.
+/// Decompiled source: Music.as
+///
+/// Original behavior:
+///   Start: instance = this
+///   Update: if (!source.isPlaying) PlaySong()
+///   PlaySong: source.clip = songs[i]; source.Play(); source.loop = true;
+///            i = (i + 1) % songs.Count
+///
+/// Note: Original sets loop=true on each song AND advances index.
+/// The loop means each song plays forever until manually stopped/changed.
 /// </summary>
 public class MusicManager : MonoBehaviour
 {
@@ -29,7 +37,8 @@ public class MusicManager : MonoBehaviour
         if (source == null)
             source = gameObject.AddComponent<AudioSource>();
 
-        source.loop = false;
+        // Original: source.loop = true (set in PlaySong, each song loops)
+        source.loop = true;
         source.volume = volume;
         source.playOnAwake = false;
     }

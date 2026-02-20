@@ -3,8 +3,13 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Manages the death/game-over screen with Mac Miller-themed score tiers.
-/// Original game had 8 tiers from "Loser" to "Most Dope" with texture swaps.
-/// Thresholds estimated from gameplay videos since original values weren't in dumps.
+/// Decompiled source: DeadMenu.as
+///
+/// Original uses strictly greater-than (>) for tier comparisons.
+/// Prize claiming available at score >= 1500.
+/// Restart via: Space, Enter, KeypadEnter, R, or restart button click.
+/// Original: restartButton/restartButtonHover textures, GUIStyle-based.
+/// Thresholds are serialized (set in scene data, not hardcoded in script).
 /// </summary>
 public class DeadMenuManager : MonoBehaviour
 {
@@ -80,39 +85,46 @@ public class DeadMenuManager : MonoBehaviour
             retryText.text = "Press Space to Retry";
     }
 
+    /// <summary>
+    /// Original DeadMenu.Start uses strictly greater-than (>) for all tier checks:
+    ///   if (score > mostdopeThresh) → mostdopeTex
+    ///   else if (score > myteamThresh) → myteamTex
+    ///   ...etc
+    ///   else → loserTex
+    /// </summary>
     private void GetTier(int score, out string name, out Sprite sprite)
     {
-        if (score >= mostDopeThresh)
+        if (score > mostDopeThresh)
         {
             name = "MOST DOPE!";
             sprite = mostDopeSprite;
         }
-        else if (score >= myTeamThresh)
+        else if (score > myTeamThresh)
         {
             name = "MY TEAM!";
             sprite = myTeamSprite;
         }
-        else if (score >= myHomieThresh)
+        else if (score > myHomieThresh)
         {
             name = "MY HOMIE!";
             sprite = myHomieSprite;
         }
-        else if (score >= myDudeThresh)
+        else if (score > myDudeThresh)
         {
             name = "MY DUDE!";
             sprite = myDudeSprite;
         }
-        else if (score >= dopeThresh)
+        else if (score > dopeThresh)
         {
             name = "DOPE!";
             sprite = dopeSprite;
         }
-        else if (score >= weatherThresh)
+        else if (score > weatherThresh)
         {
             name = "WEATHER!";
             sprite = weatherSprite;
         }
-        else if (score >= notBadThresh)
+        else if (score > notBadThresh)
         {
             name = "NOT BAD!";
             sprite = notBadSprite;

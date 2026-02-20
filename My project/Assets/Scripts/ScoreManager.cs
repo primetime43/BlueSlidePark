@@ -3,9 +3,15 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Score tracking matching original ScoreManager from SWF.
-/// Original fields: score, bestScore, userID.
-/// Original methods: OnEnable, SubmitScore, GameOver, Update, SetScore, UploadScore.
-/// Best score persisted in PlayerPrefs (original used PlayerPrefs too).
+/// Decompiled source: ScoreManager.as
+///
+/// Original fields: score, bestScore, playerName, userID.
+/// Original methods: OnEnable (singleton + load best), SetScore(int),
+///   GameOver, SubmitScore, UploadScore.
+///
+/// Scoring: Score is SET by SlideController.CreateNextPiece:
+///   score = PieceNumber - StartingPieces + bonusScore
+/// Best score persisted in PlayerPrefs "BestScore".
 /// </summary>
 public class ScoreManager : MonoBehaviour
 {
@@ -14,35 +20,35 @@ public class ScoreManager : MonoBehaviour
     [SerializeField] private float distanceMultiplier = 15f;
 
     private Text scoreText;
-    private float distanceScore;
-    private int bonusScore;
+    private int score;
+    private int bestScore;
     private bool scoring = true;
+    private float distanceAccumulator;
 
     private const string BestScoreKey = "BestScore";
 
     public int BestScore
     {
-        get { return PlayerPrefs.GetInt(BestScoreKey, 0); }
-        private set
-        {
-            PlayerPrefs.SetInt(BestScoreKey, value);
-            PlayerPrefs.Save();
-        }
+        get { return bestScore; }
     }
 
     private void Awake()
     {
+        // Original: OnEnable singleton pattern
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Debug.LogWarning("Duplicate ScoreManagers");
+            Destroy(this);
             return;
         }
         Instance = this;
+
+        // Original: if PlayerPrefs.GetInt("BestScore") > bestScore, load it
+        bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
     }
 
     private void Start()
     {
-        // Find the score number text (child of ScoreTxt)
         GameObject scoreTxtObj = GameObject.Find("ScoreTxt");
         if (scoreTxtObj != null && scoreTxtObj.transform.childCount > 0)
             scoreText = scoreTxtObj.transform.GetChild(0).GetComponent<Text>();
@@ -52,36 +58,63 @@ public class ScoreManager : MonoBehaviour
     {
         if (!scoring) return;
 
-        distanceScore += distanceMultiplier * Time.deltaTime;
-        UpdateDisplay();
-    }
-
-    public void AddBonus(int points)
-    {
-        bonusScore += points;
+        // Distance-based scoring as fallback (original used PieceNumber-based)
+        distanceAccumulator += distanceMultiplier * Time.deltaTime;
         UpdateDisplay();
     }
 
     /// <summary>
-    /// Matches original ScoreManager.GameOver() - stops scoring and updates best.
+    /// Original: ScoreManager.SetScore(int) — called by SlideController.CreateNextPiece.
+    /// score = PieceNumber - StartingPieces + bonusScore
+    /// Also updates best score in PlayerPrefs.
+    /// </summary>
+    public void SetScore(int newScore)
+    {
+        score = newScore;
+        if (score > bestScore)
+        {
+            bestScore = score;
+            PlayerPrefs.SetInt(BestScoreKey, bestScore);
+        }
+        UpdateDisplay();
+    }
+
+    /// <summary>
+    /// Original: bonusScore was on SlideController, incremented by 100 per pickup.
+    /// This adds to the bonus which gets factored into the score formula.
+    /// </summary>
+    public void AddBonus(int points)
+    {
+        if (SlideController.Instance != null)
+        {
+            SlideController.Instance.BonusScore += points;
+        }
+        // Also update score immediately for display
+        score += points;
+        if (score > bestScore)
+        {
+            bestScore = score;
+            PlayerPrefs.SetInt(BestScoreKey, bestScore);
+        }
+        UpdateDisplay();
+    }
+
+    /// <summary>
+    /// Matches original ScoreManager.GameOver() — stops scoring.
     /// </summary>
     public void StopScoring()
     {
         scoring = false;
-
-        int current = GetScore();
-        if (current > BestScore)
-            BestScore = current;
     }
 
     public int GetScore()
     {
-        return Mathf.FloorToInt(distanceScore) + bonusScore;
+        return score;
     }
 
     private void UpdateDisplay()
     {
         if (scoreText != null)
-            scoreText.text = GetScore().ToString("D4");
+            scoreText.text = score.ToString("D4");
     }
 }
