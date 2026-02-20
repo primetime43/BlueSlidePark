@@ -284,7 +284,11 @@ app.get("/request.php", apiLimiter, async (req, res) => {
       await db.insertScore(playerName, playerName, playerScore);
     }
 
-    const topScores = await db.getTopScores(TOP_N);
+    const rawScores = await db.getTopScores(TOP_N + 5);
+    // Filter out junk entries (null names, zero scores)
+    const topScores = rawScores
+      .filter((e) => e.name && e.name !== "null" && e.score > 0)
+      .slice(0, TOP_N);
     const aboveCount = await db.countAbove(playerScore);
     const rank = aboveCount + 1;
 
@@ -309,12 +313,12 @@ app.get("/request.php", apiLimiter, async (req, res) => {
 app.post("/post_scores.php", submitLimiter, async (req, res) => {
   const { user_id, score, name } = req.body;
 
-  if (!user_id) {
+  if (!user_id || user_id === "null" || user_id === "undefined") {
     return res.status(400).send("Missing user_id");
   }
 
   const playerScore = validateScore(score);
-  if (playerScore === null) {
+  if (playerScore === null || playerScore === 0) {
     return res.status(400).send("Invalid score");
   }
 
