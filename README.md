@@ -2,11 +2,48 @@
 
 Mac Miller's Blue Slide Park game — recreated in Unity 6 from the original 2012 Flash game.
 
+## Play the Original Game (Patched SWF)
+
+The original Flash game is playable again with a working leaderboard! Download `slide_patched.swf` from this repo and open it with [Ruffle](https://ruffle.rs/downloads) (Flash emulator).
+
+### Quick Start
+
+1. Download [Ruffle desktop](https://ruffle.rs/downloads) for your platform
+2. Download `slide_patched.swf` from this repo
+3. Open `slide_patched.swf` with Ruffle
+4. Enter your name and play — scores are saved to a live leaderboard
+
+### Controls
+
+- **Left/Right Arrow Keys** — Slide left and right
+- **Up Arrow** — Speed boost
+- **Space / Enter / R** — Restart after death
+
+### How It Works
+
+The original game's server (`macmillerofficial.umgfacebook.com`) has been defunct for years. This patched SWF replaces the dead URLs with a new leaderboard server, so score submission and the leaderboard work again. The server code is in the `server/` folder.
+
+### Leaderboard Server
+
+The leaderboard server matches the original API and is hosted on Heroku. To run it locally:
+
+```bash
+cd server
+npm install
+npm start
+```
+
+Then open http://localhost:3000 to play in-browser via Ruffle, or re-patch the SWF for localhost:
+
+```bash
+python server/patch_swf.py localhost:3000
+```
+
 ## About
 
 The original Blue Slide Park game was a promotional Flash game built by PLA Studios for Universal Music Group, released alongside Mac Miller's debut album "Blue Slide Park" in 2011-2012. It was hosted at `macmillerofficial.com/BlueSlidePark-game/` and ran as a Unity 3.5 project compiled to Flash via cil2as.
 
-This project recreates the game in Unity 6 (URP) using assets and game logic extracted from the original SWF files.
+This project also recreates the game in Unity 6 (URP) using assets and game logic extracted from the original SWF files.
 
 ## Original Game Videos
 
