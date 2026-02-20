@@ -3,11 +3,8 @@ using UnityEngine;
 /// <summary>
 /// Slide mesh generation for each segment.
 ///
-/// Now supports using the original HALF_PIPE meshes extracted from the SWF:
-///   HALF_PIPE.obj (center), HALF_PIPE_LEFT.obj (left edge), HALF_PIPE_RIGHT.obj (right edge).
-///
-/// If original meshes are assigned, uses them directly.
-/// Otherwise falls back to procedurally generated curved U-shape.
+/// Loads the original HALF_PIPE meshes and SLIDE_TEXTURE from Resources/ at runtime.
+/// Falls back to procedurally generated curved U-shape if models not found.
 /// </summary>
 public class SlideMeshGenerator : MonoBehaviour
 {
@@ -18,13 +15,17 @@ public class SlideMeshGenerator : MonoBehaviour
     [SerializeField] private float segmentLength = 15f;
     [SerializeField] private int curvePoints = 24;
 
-    [Header("Original Meshes (assign HALF_PIPE*.obj from Models/)")]
+    [Header("Original Meshes (auto-loaded from Resources if null)")]
     [SerializeField] private Mesh halfPipeMesh;
     [SerializeField] private Mesh halfPipeLeftMesh;
     [SerializeField] private Mesh halfPipeRightMesh;
 
+    private Material slideBlueMat;
+
     private void Awake()
     {
+        CreateSlideMaterial();
+
         foreach (Transform segment in groundTrans)
         {
             // Destroy existing flat plane children immediately so they're gone before Start()
@@ -38,20 +39,31 @@ public class SlideMeshGenerator : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Creates a slide segment using the original extracted HALF_PIPE meshes.
-    /// The original slide had center + left + right pieces assembled together.
-    /// </summary>
+    private void CreateSlideMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        if (shader == null) return;
+
+        Texture2D slideTex = Resources.Load<Texture2D>("Textures/SLIDE_TEXTURE_001");
+        if (slideTex != null)
+        {
+            slideBlueMat = new Material(shader);
+            slideBlueMat.mainTexture = slideTex;
+        }
+        else
+        {
+            // Fallback: solid blue matching original slide color
+            slideBlueMat = new Material(shader);
+            slideBlueMat.color = new Color(0.33f, 0.53f, 0.93f);
+        }
+    }
+
     private void CreateOriginalSegment(Transform parent)
     {
-        // Center piece
         CreateMeshPart(parent, "HalfPipe_Center", halfPipeMesh, Vector3.zero);
-
-        // Left edge (if available)
         if (halfPipeLeftMesh != null)
             CreateMeshPart(parent, "HalfPipe_Left", halfPipeLeftMesh, Vector3.zero);
-
-        // Right edge (if available)
         if (halfPipeRightMesh != null)
             CreateMeshPart(parent, "HalfPipe_Right", halfPipeRightMesh, Vector3.zero);
     }
@@ -69,8 +81,7 @@ public class SlideMeshGenerator : MonoBehaviour
 
         mf.sharedMesh = mesh;
         mc.sharedMesh = mesh;
-        if (slideMaterial != null)
-            mr.sharedMaterial = slideMaterial;
+        mr.sharedMaterial = slideBlueMat != null ? slideBlueMat : slideMaterial;
     }
 
     /// <summary>
@@ -89,7 +100,7 @@ public class SlideMeshGenerator : MonoBehaviour
         Mesh mesh = BuildCurvedMesh();
         mf.mesh = mesh;
         mc.sharedMesh = mesh;
-        mr.material = slideMaterial;
+        mr.sharedMaterial = slideBlueMat != null ? slideBlueMat : slideMaterial;
     }
 
     private Mesh BuildCurvedMesh()
