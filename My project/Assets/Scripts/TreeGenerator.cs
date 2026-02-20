@@ -34,6 +34,7 @@ public class TreeGenerator : MonoBehaviour
     private void Start()
     {
         LoadTreeMeshes();
+        LoadTreeMaterial();
 
         if (groundTrans == null) return;
 
@@ -48,17 +49,17 @@ public class TreeGenerator : MonoBehaviour
         // Try to load original extracted tree meshes
         if (treeMesh001 == null)
         {
-            var go = Resources.Load<GameObject>("TREE_001");
+            var go = Resources.Load<GameObject>("Models/TREE_001");
             if (go != null) treeMesh001 = go.GetComponentInChildren<MeshFilter>()?.sharedMesh;
         }
         if (treeMesh002 == null)
         {
-            var go = Resources.Load<GameObject>("TREE_002");
+            var go = Resources.Load<GameObject>("Models/TREE_002");
             if (go != null) treeMesh002 = go.GetComponentInChildren<MeshFilter>()?.sharedMesh;
         }
         if (treeMesh003 == null)
         {
-            var go = Resources.Load<GameObject>("TREE_003");
+            var go = Resources.Load<GameObject>("Models/TREE_003");
             if (go != null) treeMesh003 = go.GetComponentInChildren<MeshFilter>()?.sharedMesh;
         }
 
@@ -76,6 +77,21 @@ public class TreeGenerator : MonoBehaviour
             if (treeMesh002 != null) treeMeshes[i++] = treeMesh002;
             if (treeMesh003 != null) treeMeshes[i++] = treeMesh003;
         }
+    }
+
+    private void LoadTreeMaterial()
+    {
+        if (treeMaterial != null) return;
+
+        Texture2D tex = Resources.Load<Texture2D>("Textures/MAC_TREE_TEXTURE");
+        if (tex == null) return;
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        if (shader == null) return;
+
+        treeMaterial = new Material(shader);
+        treeMaterial.mainTexture = tex;
     }
 
     private void SpawnTreesForSegment(Transform segment)

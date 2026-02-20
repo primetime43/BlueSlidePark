@@ -23,7 +23,7 @@ public class LeaderboardManager : MonoBehaviour
     public static LeaderboardManager Instance { get; private set; }
 
     [Header("Server Configuration")]
-    [SerializeField] private string serverBaseUrl = "";
+    [SerializeField] private string serverBaseUrl = "http://localhost:3000";
     [SerializeField] private string fetchEndpoint = "/request.php";
     [SerializeField] private string submitEndpoint = "/post_scores.php";
 

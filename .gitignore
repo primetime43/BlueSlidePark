@@ -36,3 +36,7 @@ sysinfo.txt
 *.unitypackage
 
 My project/Logs/
+
+# Server
+server/node_modules/
+server/leaderboard.db

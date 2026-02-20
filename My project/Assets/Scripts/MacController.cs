@@ -117,8 +117,12 @@ public class MacController : MonoBehaviour
 
     private void OnTriggerExit(Collider collider)
     {
+        // Player fell off the slide — treat as death
         if (collider.gameObject.CompareTag("Killbox"))
-            ResetCharacter();
+        {
+            if (!immortal)
+                Die();
+        }
     }
 
     private void OnTriggerEnter(Collider other)
@@ -220,13 +224,6 @@ public class MacController : MonoBehaviour
             rot.z = -dampedRotZ;
             visualModel.localEulerAngles = rot;
         }
-
-        // Edge death: player went past slide boundary
-        if (isGrounded && !isDead && Mathf.Abs(transform.position.x) > slideHalfWidth)
-        {
-            if (!immortal)
-                Die();
-        }
     }
 
     /// <summary>
@@ -261,6 +258,14 @@ public class MacController : MonoBehaviour
         // dampedRotZ tracks visual lean angle (used for settle + visual tilt)
         dampedRotZ = Mathf.Lerp(dampedRotZ, lean * deathAngle, dampLerp * Time.fixedDeltaTime);
 
+        // Original death check: eulerAngles.z > deathAngle means player leaned too far
+        if (Mathf.Abs(dampedRotZ) >= deathAngle)
+        {
+            if (!immortal)
+                Die();
+            return;
+        }
+
         // Settle calculation (original formula from SliderMovement.as lines 206-213)
         float normZ = ((dampedRotZ % 360f) + 360f) % 360f;
         float settle = 0f;
@@ -270,13 +275,10 @@ public class MacController : MonoBehaviour
             settle = 1f - (normZ - 180f) / 180f;
 
         // Original: RotationAmount = (settle * settleFactor + input) * RotationSpeed * dt
-        // Converted to lateral velocity for our physics-based slide
-        float lateralSpeed = (settle * settleFactor + input) * rotationSpeed;
-
-        // Set X velocity directly (gravity handles Y, Z is frozen)
-        Vector3 vel = rb.linearVelocity;
-        vel.x = lateralSpeed;
-        rb.linearVelocity = vel;
+        // Converted to lateral force — using AddForce so the curved MeshCollider
+        // properly pushes the player up the bowl walls instead of clipping through
+        float lateralForce = (settle * settleFactor + input) * rotationSpeed;
+        rb.AddForce(Vector3.right * lateralForce, ForceMode.Acceleration);
     }
 
     private string GetPlayerName()

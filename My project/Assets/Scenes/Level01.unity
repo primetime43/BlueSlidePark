@@ -233,6 +233,7 @@ GameObject:
   - component: {fileID: 1108}
   - component: {fileID: 1109}
   - component: {fileID: 1110}
+  - component: {fileID: 1111}
   m_Layer: 0
   m_Name: GameController
   m_TagString: Untagged
@@ -270,7 +271,7 @@ MonoBehaviour:
   slides: []
   groundTrans: {fileID: 1202}
   pickups: {fileID: 3202}
-  lerpSpeed: 15
+  lerpSpeed: 25
   totalSlideLength: 0
 --- !u!114 &1104
 MonoBehaviour:
@@ -457,7 +458,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e1a2c3d4e5f60032e1a2c3d4e5f60032, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverBaseUrl: 
+  serverBaseUrl: http://localhost:3000
   fetchEndpoint: /request.php
   submitEndpoint: /post_scores.php
   leaderboardSalt: a1e902e
@@ -489,6 +490,22 @@ MonoBehaviour:
   running: 0
   cullMap: 0
   testAnims: 0
+--- !u!114 &1111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b0edfb8b75d0f54f873465e734fbc7a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  playerScale: 0.1
+  playerYOffset: -0.4
+  pickupScale: 1.5
+  obstacleScale: 1.5
 --- !u!1 &1201
 GameObject:
   m_ObjectHideFlags: 0
@@ -3168,7 +3185,7 @@ Transform:
   m_GameObject: {fileID: 3001}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: 2}
+  m_LocalPosition: {x: 0, y: 2, z: 2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3263,8 +3280,8 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3001}
   serializedVersion: 5
-  m_Mass: 100
-  m_LinearDamping: 3
+  m_Mass: 10
+  m_LinearDamping: 1
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
@@ -3337,13 +3354,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3101}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.1305262, y: 0, z: 0, w: 0.9914449}
-  m_LocalPosition: {x: 0, y: 3.5, z: -5}
+  m_LocalRotation: {x: 0.0871557, y: 0, z: 0, w: 0.9961947}
+  m_LocalPosition: {x: 0, y: 3, z: -6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3002}
-  m_LocalEulerAnglesHint: {x: 15, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 10, y: 0, z: 0}
 --- !u!20 &3103
 Camera:
   m_ObjectHideFlags: 0
@@ -4113,7 +4130,7 @@ Transform:
   m_GameObject: {fileID: 3801}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -50, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4138,7 +4155,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 500, y: 1, z: 1000}
+  m_Size: {x: 500, y: 20, z: 1000}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &3901
 GameObject:
