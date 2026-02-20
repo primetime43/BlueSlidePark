@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// Mute and quality toggle matching original MuteQuality class from SWF.
@@ -11,25 +12,54 @@ using UnityEngine;
 ///   OnGUI: mute toggle button (muteOn/muteOff/muteRollover textures)
 ///          quality toggle button (qualityOn/qualityOff/qualityRollover textures)
 ///
-/// In our Unity 6 recreation, this is simplified to use UI buttons or keyboard toggles
-/// since we don't have the original OnGUI texture assets yet.
+/// Now uses the original extracted button textures from Resources/UI/.
 /// </summary>
 public class MuteQuality : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Light directionalLight;
 
+    [Header("UI Buttons (optional - auto-loaded sprites from Resources/UI/)")]
+    [SerializeField] private Image muteButtonImage;
+    [SerializeField] private Image qualityButtonImage;
+
     private bool muted;
     private bool lowQuality;
     private bool dirty;
 
+    private Sprite soundOnSprite;
+    private Sprite soundOffSprite;
+    private Sprite highQualitySprite;
+    private Sprite lowQualitySprite;
+
     private void Start()
     {
+        LoadSprites();
+
         // Original: load from PlayerPrefs
         muted = PlayerPrefs.GetInt("Muted", 0) != 0;
         lowQuality = PlayerPrefs.GetInt("Low Quality", 0) != 0;
         dirty = true;
         ApplySettings();
+    }
+
+    private void LoadSprites()
+    {
+        soundOnSprite = LoadSprite("UI/SOUND_ON");
+        soundOffSprite = LoadSprite("UI/SOUND_OFF");
+        highQualitySprite = LoadSprite("UI/HIGH_QUALITY");
+        lowQualitySprite = LoadSprite("UI/LOW_QUALITY");
+    }
+
+    private Sprite LoadSprite(string path)
+    {
+        Texture2D tex = Resources.Load<Texture2D>(path);
+        if (tex != null)
+        {
+            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                new Vector2(0.5f, 0.5f));
+        }
+        return null;
     }
 
     private void Update()
@@ -74,14 +104,14 @@ public class MuteQuality : MonoBehaviour
         {
             AudioListener.pause = true;
             AudioListener.volume = 0f;
-            foreach (var source in GetComponentsInChildren<AudioSource>())
+            foreach (var source in FindObjectsByType<AudioSource>(FindObjectsSortMode.None))
                 source.mute = true;
         }
         else
         {
             AudioListener.pause = false;
             AudioListener.volume = 1f;
-            foreach (var source in GetComponentsInChildren<AudioSource>())
+            foreach (var source in FindObjectsByType<AudioSource>(FindObjectsSortMode.None))
                 source.mute = false;
         }
 
@@ -91,6 +121,18 @@ public class MuteQuality : MonoBehaviour
             directionalLight.shadows = lowQuality
                 ? LightShadows.None
                 : LightShadows.Hard;
+        }
+
+        // Update button sprites
+        if (muteButtonImage != null)
+        {
+            Sprite s = muted ? soundOffSprite : soundOnSprite;
+            if (s != null) muteButtonImage.sprite = s;
+        }
+        if (qualityButtonImage != null)
+        {
+            Sprite s = lowQuality ? lowQualitySprite : highQualitySprite;
+            if (s != null) qualityButtonImage.sprite = s;
         }
     }
 

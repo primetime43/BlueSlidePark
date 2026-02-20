@@ -1,5 +1,14 @@
 using UnityEngine;
 
+/// <summary>
+/// Slide mesh generation for each segment.
+///
+/// Now supports using the original HALF_PIPE meshes extracted from the SWF:
+///   HALF_PIPE.obj (center), HALF_PIPE_LEFT.obj (left edge), HALF_PIPE_RIGHT.obj (right edge).
+///
+/// If original meshes are assigned, uses them directly.
+/// Otherwise falls back to procedurally generated curved U-shape.
+/// </summary>
 public class SlideMeshGenerator : MonoBehaviour
 {
     [SerializeField] private Transform groundTrans;
@@ -9,6 +18,11 @@ public class SlideMeshGenerator : MonoBehaviour
     [SerializeField] private float segmentLength = 15f;
     [SerializeField] private int curvePoints = 24;
 
+    [Header("Original Meshes (assign HALF_PIPE*.obj from Models/)")]
+    [SerializeField] private Mesh halfPipeMesh;
+    [SerializeField] private Mesh halfPipeLeftMesh;
+    [SerializeField] private Mesh halfPipeRightMesh;
+
     private void Awake()
     {
         foreach (Transform segment in groundTrans)
@@ -17,10 +31,51 @@ public class SlideMeshGenerator : MonoBehaviour
             for (int i = segment.childCount - 1; i >= 0; i--)
                 DestroyImmediate(segment.GetChild(i).gameObject);
 
-            CreateCurvedSegment(segment);
+            if (halfPipeMesh != null)
+                CreateOriginalSegment(segment);
+            else
+                CreateCurvedSegment(segment);
         }
     }
 
+    /// <summary>
+    /// Creates a slide segment using the original extracted HALF_PIPE meshes.
+    /// The original slide had center + left + right pieces assembled together.
+    /// </summary>
+    private void CreateOriginalSegment(Transform parent)
+    {
+        // Center piece
+        CreateMeshPart(parent, "HalfPipe_Center", halfPipeMesh, Vector3.zero);
+
+        // Left edge (if available)
+        if (halfPipeLeftMesh != null)
+            CreateMeshPart(parent, "HalfPipe_Left", halfPipeLeftMesh, Vector3.zero);
+
+        // Right edge (if available)
+        if (halfPipeRightMesh != null)
+            CreateMeshPart(parent, "HalfPipe_Right", halfPipeRightMesh, Vector3.zero);
+    }
+
+    private void CreateMeshPart(Transform parent, string name, Mesh mesh, Vector3 localPos)
+    {
+        GameObject meshObj = new GameObject(name);
+        meshObj.transform.SetParent(parent, false);
+        meshObj.transform.localPosition = localPos;
+        meshObj.tag = "Floor";
+
+        MeshFilter mf = meshObj.AddComponent<MeshFilter>();
+        MeshRenderer mr = meshObj.AddComponent<MeshRenderer>();
+        MeshCollider mc = meshObj.AddComponent<MeshCollider>();
+
+        mf.sharedMesh = mesh;
+        mc.sharedMesh = mesh;
+        if (slideMaterial != null)
+            mr.sharedMaterial = slideMaterial;
+    }
+
+    /// <summary>
+    /// Fallback: procedurally generate a curved U-shape slide segment.
+    /// </summary>
     private void CreateCurvedSegment(Transform parent)
     {
         GameObject meshObj = new GameObject("CurvedSlide");
@@ -58,7 +113,6 @@ public class SlideMeshGenerator : MonoBehaviour
                 float xPos = Mathf.Lerp(-slideWidth * 0.5f, slideWidth * 0.5f, t);
 
                 // Smooth U-shape: flat bottom in the middle, curved walls rising at edges
-                // Using a power curve for smoother transition
                 float n = 2f * t - 1f; // -1 to 1
                 float curve = n * n * n * n; // x^4 gives flatter bottom, steeper walls
                 float yPos = wallHeight * curve;

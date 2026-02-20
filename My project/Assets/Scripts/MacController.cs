@@ -74,6 +74,8 @@ public class MacController : MonoBehaviour
 
     public void ResetCharacter()
     {
+        isDead = false;
+        rb.isKinematic = false;
         transform.position = startingPos;
         gameScript.ResetWorld();
         rb.linearVelocity = Vector3.zero;
