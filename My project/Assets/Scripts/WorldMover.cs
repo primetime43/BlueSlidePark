@@ -8,6 +8,9 @@ public class WorldMover : MonoBehaviour
     [SerializeField] private Transform pickups;
     [SerializeField] private float lerpSpeed = 25f;
     [SerializeField] private float totalSlideLength;
+    [SerializeField] private float pickupXRange = 4f;
+    [SerializeField] private float pickupMinSpacing = 10f;
+    [SerializeField] private float pickupMaxSpacing = 25f;
 
     private int slideChildCount;
     private float segmentLength;
@@ -23,6 +26,7 @@ public class WorldMover : MonoBehaviour
     private void Start()
     {
         SlideCounter();
+        InitializePickupPositions();
     }
 
     private void Update()
@@ -63,10 +67,51 @@ public class WorldMover : MonoBehaviour
 
     private void RecyclePickups()
     {
-        // When pickups have scrolled past the total length, loop them forward
-        if (pickups.position.z < -totalSlideLength)
+        // Find the furthest forward pickup (local Z)
+        float maxLocalZ = float.MinValue;
+        foreach (Transform child in pickups)
         {
-            pickups.position += new Vector3(0, 0, totalSlideLength);
+            if (child.localPosition.z > maxLocalZ)
+                maxLocalZ = child.localPosition.z;
+        }
+
+        // Recycle each item individually when it scrolls behind the player
+        foreach (Transform child in pickups)
+        {
+            if (child.position.z < -segmentLength)
+            {
+                Vector3 localPos = child.localPosition;
+                localPos.z = maxLocalZ + Random.Range(pickupMinSpacing, pickupMaxSpacing);
+                localPos.x = Random.Range(-pickupXRange, pickupXRange);
+                child.localPosition = localPos;
+                maxLocalZ = localPos.z;
+
+                // Re-enable collected pickups
+                var col = child.GetComponent<Collider>();
+                if (col != null)
+                    col.enabled = true;
+                var mr = child.GetComponent<MeshRenderer>();
+                if (mr != null)
+                    mr.enabled = true;
+
+                // Reset spinner state for reuse
+                var spinner = child.GetComponent<PickupSpinner>();
+                if (spinner != null)
+                    spinner.ResetForReuse();
+            }
+        }
+    }
+
+    private void InitializePickupPositions()
+    {
+        float z = 15f;
+        foreach (Transform child in pickups)
+        {
+            Vector3 localPos = child.localPosition;
+            localPos.x = Random.Range(-pickupXRange, pickupXRange);
+            localPos.z = z;
+            child.localPosition = localPos;
+            z += Random.Range(pickupMinSpacing, pickupMaxSpacing);
         }
     }
 
@@ -80,6 +125,8 @@ public class WorldMover : MonoBehaviour
         {
             slides[i].transform.localPosition = new Vector3(0, 0, segmentLength * i);
         }
+
+        InitializePickupPositions();
     }
 
     private void SlideCounter()

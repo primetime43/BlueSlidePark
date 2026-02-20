@@ -49,23 +49,29 @@ public class PickupSpinner : MonoBehaviour
     }
 
     /// <summary>
-    /// Called on pickup collection. Matches original VictoryBall.ShowPickup + OnTriggerEnter.
-    /// Original: flyUp = true, ShowPickup(), Invoke("Die", 5)
+    /// Called on pickup collection. Plays a brief fly-up then hides.
+    /// Stays parented so WorldMover can recycle it.
     /// </summary>
     public void ShowPickup()
     {
         flyUp = true;
-        // Detach so it doesn't scroll with the world
-        transform.SetParent(null);
-        // Original: Invoke("Die", 5) — self-destructs after 5 seconds
-        Invoke(nameof(Die), 5f);
+        Invoke(nameof(HideAfterCollection), 0.5f);
+    }
+
+    private void HideAfterCollection()
+    {
+        flyUp = false;
+        var mr = GetComponent<MeshRenderer>();
+        if (mr != null) mr.enabled = false;
     }
 
     /// <summary>
-    /// Original: VictoryBall.Die → Object.Destroy(gameObject)
+    /// Called by WorldMover when recycling this pickup to a new position.
     /// </summary>
-    private void Die()
+    public void ResetForReuse()
     {
-        Destroy(gameObject);
+        CancelInvoke();
+        flyUp = false;
+        startPos = transform.localPosition;
     }
 }
