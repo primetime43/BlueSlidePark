@@ -1,0 +1,32 @@
+fileFormatVersion: 2
+guid: e1a2c3d4e5f60015e1a2c3d4e5f60015
+ModelImporter:
+  serializedVersion: 22200
+  internalIDToNameTable: []
+  externalObjects: {}
+  materials:
+    materialImportMode: 0
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+  meshes:
+    fileScale: 1
+    meshCompression: 0
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    generateSecondaryUV: 0
+    useFileUnits: 1
+    useFileScale: 1
+    isReadable: 0
+  userData:
+  assetBundleName:
+  assetBundleVariant:
