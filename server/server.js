@@ -222,7 +222,7 @@ app.get("/", (req, res) => {
       player.style.height = "100%";
       document.getElementById("container").appendChild(player);
       player.load({
-        url: "/game/slide_patched.swf",
+        url: "https://raw.githubusercontent.com/primetime43/BlueSlidePark/main/server/public/slide_patched.swf",
         allowNetworking: "all",
         allowScriptAccess: true,
         quality: "high",
