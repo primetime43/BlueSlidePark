@@ -1,6 +1,6 @@
 # BlueSlidePark
 
-Game: https://bsp-lb-b934878f6a45.herokuapp.com/
+Game: https://bsp-lb-b934878f6a45.herokuapp.com/ <br>
 Leaderboards: https://bsp-lb-b934878f6a45.herokuapp.com/leaderboards
 
 ## Play the Original Game (Patched SWF)
