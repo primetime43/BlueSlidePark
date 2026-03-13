@@ -1,5 +1,8 @@
 # BlueSlidePark
 
+Game: https://bsp-lb-b934878f6a45.herokuapp.com/
+Leaderboards: https://bsp-lb-b934878f6a45.herokuapp.com/leaderboards
+
 ## Play the Original Game (Patched SWF)
 
 The original Flash game is playable again with a working leaderboard! Download `slide_patched.swf` from this repo and open it with [Ruffle](https://ruffle.rs/downloads) (Flash emulator).
